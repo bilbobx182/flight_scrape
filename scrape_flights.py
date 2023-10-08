@@ -4,17 +4,26 @@ from time import sleep
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium import webdriver
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver import DesiredCapabilities
+from selenium_stealth import stealth
+
 import pprint
 
 URL = "https://www.skyscanner.ie/transport/flights/DUB/NRT/240725/?adults=1"
-WAIT_TIME = 15
+WAIT_TIME = 10
 ACCEPT_ALL = "OK"
 
-trip = [['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
-        ['DUB_KIX', 'NRT_PUS', 'ICN_DUB'],
+trip = [['DUB_NRT', 'PUS_ICN', 'KIX_DUB'],
         ['DUB_ICN', 'PUS_KIX', 'NRT_DUB'],
-        ['DUB_NRT', 'PUS_ICN', 'KIX_DUB']]
+        ['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
+        ['DUB_KIX', 'NRT_PUS', 'ICN_DUB']]
+
+# trip = [['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
+#         ['DUB_KIX', 'NRT_PUS', 'ICN_DUB'],
+#         ['DUB_ICN', 'PUS_KIX', 'NRT_DUB'],
+#         ['DUB_NRT', 'PUS_ICN', 'KIX_DUB']]
 
 
 def get_dates(month=7, day=25, between=[6, 10]):
@@ -73,11 +82,38 @@ class SkyScanner:
 
 
         # options.headless = True  # you're lucky headless works for this site... for now
+        # options = uc.ChromeOptions()
+        # options.add_argument("start-maximized")
+        #
+        #
+        # options.add_argument(f"user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0")
+        # # Chrome is controlled by automated test software
+        # options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        # options.add_experimental_option('useAutomationExtension', False)
+        # driver = uc.Chrome()
+        # # Selenium Stealth settings
+        # stealth(driver,
+        #         languages=["en-US", "en"],
+        #         vendor="Google Inc.",
+        #         platform="Intel Mac OS X 10.15",
+        #         webgl_vendor="Intel Inc.",
+        #         renderer="Intel Iris OpenGL Engine",
+        #         fix_hairline=True,
+        #         )
 
-        chrome_options = uc.ChromeOptions()
-        chrome_options.add_argument('--no-first-run --no-service-autorun --password-store=basic')
+        profile = webdriver.FirefoxProfile()
+        profile.set_preference("dom.webdriver.enabled", False)
+        profile.set_preference('useAutomationExtension', False)
+        profile.set_preference("general.useragent.override",
+                               "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.5938.149 Safari/537.36")
+        profile.update_preferences()
+        desired = DesiredCapabilities.FIREFOX
 
-        driver = uc.Chrome()
+        driver = webdriver.Firefox(
+            firefox_profile=profile,
+            desired_capabilities=desired
+        )
+
         self.driver = driver
 
     def handle_cookies(self):
@@ -110,24 +146,18 @@ class SkyScanner:
         :return:
         """
 
-        for flight_type in flight_info:
-            flight_type = flight_type.replace("€", "").replace("h", "").lower()
-            flight_type = flight_type.split(" ")
-
-            minutes = 0
-            if len(flight_type) > 3:
-                # Covering edge case where there are no minutes and it's a round flight.
-                minutes = flight_type[3]
-
-            self.flights[meta['flight']][flight_type[0]] = []
+        for catagory in flight_info:
+            catagory = catagory.text
+            catagory = catagory.replace("€", "").replace("h", "").lower()
+            columns = catagory.split("\n")
+            self.flights[meta['flight']][columns[0]] = []
 
             flight_data_formatted = {
                 'date': meta['date'],
-                "price": flight_type[1],
-                "time_hours": flight_type[2],
-                "time_minutes": minutes
-            }
-            self.flights[meta['flight']][flight_type[0]].append(flight_data_formatted)
+                "price": columns[1],
+                "time_hours": columns[2],
+                }
+            self.flights[meta['flight']][columns[0]].append(flight_data_formatted)
 
     def search_flight(self, flight_queries):
         """
@@ -138,19 +168,19 @@ class SkyScanner:
         """
         try:
 
-            WebDriverWait(self.driver, random.randint(13, 46))
+            WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
             self.driver.get(flight_queries['url'])
             self.handle_cookies()
             # Force it to wait for the page to load
-            WebDriverWait(self.driver, random.randint(13, 46))
+            WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
             flight_info = self.get_flight_info()
 
             self.flights[flight_queries['flight_meta']['flight']] = {}
             self.standardise_flight(flight_info, flight_queries['flight_meta'])
+            self.store_results()
         except Exception as e:
             print(f"FUCK {e}")
-        finally:
-            self.driver.close()
+
 
     def store_results(self):
         pprint.pprint(self.flights)
@@ -164,7 +194,5 @@ if __name__ == '__main__':
     for flight_query in flight_queries:
         sky.search_flight(flight_query)
         sleep(random.randint(5, 30))
-
-    sky.store_results()
 
 
