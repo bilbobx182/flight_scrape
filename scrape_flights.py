@@ -7,28 +7,24 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium import webdriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import DesiredCapabilities
-from selenium_stealth import stealth
 
 import pprint
 
-URL = "https://www.skyscanner.ie/transport/flights/DUB/NRT/240725/?adults=1"
-WAIT_TIME = 10
+MONTH = 7
+DAY = 27
+WAIT_TIME = 30
 ACCEPT_ALL = "OK"
+
 
 flights = {}
 
-trip = [['DUB_NRT', 'PUS_ICN', 'KIX_DUB'],
+trip = [['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
+        ['DUB_KIX', 'NRT_PUS', 'ICN_DUB'],
         ['DUB_ICN', 'PUS_KIX', 'NRT_DUB'],
-        ['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
-        ['DUB_KIX', 'NRT_PUS', 'ICN_DUB']]
-
-# trip = [['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
-#         ['DUB_KIX', 'NRT_PUS', 'ICN_DUB'],
-#         ['DUB_ICN', 'PUS_KIX', 'NRT_DUB'],
-#         ['DUB_NRT', 'PUS_ICN', 'KIX_DUB']]
+        ['DUB_NRT', 'PUS_ICN', 'KIX_DUB']]
 
 
-def get_dates(month=7, day=25, between=[6, 10]):
+def get_dates(month=MONTH, day=DAY, between=[6, 10]):
     """
     Method to get the dates in skyscanner format.
     :param month: date of the month ie August = 8
@@ -45,9 +41,8 @@ def get_dates(month=7, day=25, between=[6, 10]):
     return [start, mid, end]
 
 
-def generate_flight_query():
+def generate_flight_query(dates):
     URL = "https://www.skyscanner.ie/transport/flights/{}/{}/{}/?adults=1"
-    dates = get_dates()
     result = []
 
     for journey in trip:
@@ -82,7 +77,7 @@ class SkyScanner:
         :return: None
         """
 
-        # Exit early.
+        # Exit early, force reset to avoid bot detection.
         if self.driver:
             self.driver.quit()
             self.driver = None
@@ -90,6 +85,7 @@ class SkyScanner:
 
 
         profile = webdriver.FirefoxProfile()
+
 
         profile.set_preference("dom.webdriver.enabled", False)
         profile.set_preference('useAutomationExtension', False)
@@ -111,8 +107,7 @@ class SkyScanner:
         Method to accept Click the OK to the cookies
         :return:
         """
-        wait = WebDriverWait(self.driver, 5)
-
+        wait = WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
         but = "BpkButtonBase_bpk-button__ZWUyM CookieBanner_cookie-banner__button__YmNkM CookieBanner_cookie-banner__button-accept__YmYyZ"
         before = f"//button[@class='{but}']"
         wait.until(EC.element_to_be_clickable((By.XPATH, before))).click()
@@ -138,15 +133,12 @@ class SkyScanner:
 
         for catagory in flight_info:
             catagory = catagory.text
-            catagory = catagory.replace("€", "").replace("h", "").lower()
+            catagory = catagory.replace("€", "").lower()
             columns = catagory.split("\n")
             flights[meta['flight']][columns[0]] = []
 
-            flight_data_formatted = {
-                'date': meta['date'],
-                "price": columns[1],
-                "time_hours": columns[2],
-                }
+            flight_data_formatted = {'date': meta['date'],"price": columns[1],"time_hours": columns[2]}
+            print(f"Adding {meta['flight']} {columns[0]} {flight_data_formatted}")
             flights[meta['flight']][columns[0]].append(flight_data_formatted)
 
     def search_flight(self, flight_queries):
@@ -163,25 +155,35 @@ class SkyScanner:
             self.handle_cookies()
             # Force it to wait for the page to load
             WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
+            sleep(random.randint(1, 6))
             flight_info = self.get_flight_info()
             flights[flight_queries['flight_meta']['flight']] = {}
             self.standardise_flight(flight_info, flight_queries['flight_meta'])
             self.configure_driver()
         except Exception as e:
             print(f"FUCK {e}")
+            self.configure_driver()
 
 
 
 if __name__ == '__main__':
-    try:
-        flight_queries = generate_flight_query()
-        sky = SkyScanner()
-        for flight_query in flight_queries:
-            sky.search_flight(flight_query)
-            sleep(random.randint(5, 30))
-    except Exception as error:
-        print(error)
-    finally:
-        pprint.pprint(flights)
+
+    # I want a bunch of flight to compare prices between start and end of the month
+    day_numbers = [1, 10, 20, 29]
+
+
+    for day in day_numbers:
+        dates = get_dates(day=day, month=7)
+        sleep(random.randint(45, 120))
+        try:
+            flight_queries = generate_flight_query(dates)
+            sky = SkyScanner()
+            for flight_query in flight_queries:
+                sky.search_flight(flight_query)
+                sleep(random.randint(45, 120))
+        except Exception as error:
+            print(error)
+        finally:
+            pprint.pprint(flights)
 
 
