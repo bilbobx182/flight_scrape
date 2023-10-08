@@ -15,6 +15,8 @@ URL = "https://www.skyscanner.ie/transport/flights/DUB/NRT/240725/?adults=1"
 WAIT_TIME = 10
 ACCEPT_ALL = "OK"
 
+flights = {}
+
 trip = [['DUB_NRT', 'PUS_ICN', 'KIX_DUB'],
         ['DUB_ICN', 'PUS_KIX', 'NRT_DUB'],
         ['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
@@ -69,10 +71,10 @@ def generate_flight_query():
 
 class SkyScanner:
     driver = None
-    flights = {}
 
     def __init__(self):
-        self.configure_driver()
+        # self.configure_driver()
+        print("Starting")
 
     def configure_driver(self):
         """
@@ -80,32 +82,19 @@ class SkyScanner:
         :return: None
         """
 
+        # Exit early.
+        if self.driver:
+            self.driver.quit()
+            self.driver = None
+            return None
 
-        # options.headless = True  # you're lucky headless works for this site... for now
-        # options = uc.ChromeOptions()
-        # options.add_argument("start-maximized")
-        #
-        #
-        # options.add_argument(f"user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/118.0")
-        # # Chrome is controlled by automated test software
-        # options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        # options.add_experimental_option('useAutomationExtension', False)
-        # driver = uc.Chrome()
-        # # Selenium Stealth settings
-        # stealth(driver,
-        #         languages=["en-US", "en"],
-        #         vendor="Google Inc.",
-        #         platform="Intel Mac OS X 10.15",
-        #         webgl_vendor="Intel Inc.",
-        #         renderer="Intel Iris OpenGL Engine",
-        #         fix_hairline=True,
-        #         )
 
         profile = webdriver.FirefoxProfile()
+
         profile.set_preference("dom.webdriver.enabled", False)
         profile.set_preference('useAutomationExtension', False)
         profile.set_preference("general.useragent.override",
-                               "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.5938.149 Safari/537.36")
+                               f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/{random.randint(5, 500)}.{random.randint(5, 100)} (KHTML, like Gecko) Chrome/{random.randint(100, 120)}.0.{random.randint(5, 5000)}.{random.randint(100, 120)} Safari/{random.randint(100, 520)}.{random.randint(1, 120)}")
         profile.update_preferences()
         desired = DesiredCapabilities.FIREFOX
 
@@ -115,6 +104,7 @@ class SkyScanner:
         )
 
         self.driver = driver
+
 
     def handle_cookies(self):
         """
@@ -150,49 +140,48 @@ class SkyScanner:
             catagory = catagory.text
             catagory = catagory.replace("€", "").replace("h", "").lower()
             columns = catagory.split("\n")
-            self.flights[meta['flight']][columns[0]] = []
+            flights[meta['flight']][columns[0]] = []
 
             flight_data_formatted = {
                 'date': meta['date'],
                 "price": columns[1],
                 "time_hours": columns[2],
                 }
-            self.flights[meta['flight']][columns[0]].append(flight_data_formatted)
+            flights[meta['flight']][columns[0]].append(flight_data_formatted)
 
     def search_flight(self, flight_queries):
         """
-
+        Search for a single flight, get the info from it.
         :param url:
         :param flight_meta:
         :return:
         """
         try:
-
+            self.configure_driver()
             WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
             self.driver.get(flight_queries['url'])
             self.handle_cookies()
             # Force it to wait for the page to load
             WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
             flight_info = self.get_flight_info()
-
-            self.flights[flight_queries['flight_meta']['flight']] = {}
+            flights[flight_queries['flight_meta']['flight']] = {}
             self.standardise_flight(flight_info, flight_queries['flight_meta'])
-            self.store_results()
+            self.configure_driver()
         except Exception as e:
             print(f"FUCK {e}")
 
 
-    def store_results(self):
-        pprint.pprint(self.flights)
-
-
 
 if __name__ == '__main__':
-    flight_queries = generate_flight_query()
-    sky = SkyScanner()
-
-    for flight_query in flight_queries:
-        sky.search_flight(flight_query)
-        sleep(random.randint(5, 30))
+    try:
+        flight_queries = generate_flight_query()
+        sky = SkyScanner()
+        for flight_query in flight_queries:
+            sky.search_flight(flight_query)
+            sleep(random.randint(5, 30))
+    except Exception as error:
+        print(error)
+    finally:
+        pprint.pprint(flights)
 
 
