@@ -154,15 +154,17 @@ class SkyScanner:
             WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
             self.driver.get(flight_queries['url'])
             self.handle_cookies()
-            # Force it to wait for the page to load
-            WebDriverWait(self.driver, random.randint(WAIT_TIME/2, WAIT_TIME))
-            sleep(random.randint(1, 6))
+            # Not sure the driver is blocking, so sleeping again
+            sleep(random.randint(int(WAIT_TIME/2), WAIT_TIME))
+            # A bunch of waits so we load all the flights
+            WebDriverWait(self.driver, random.randint(WAIT_TIME, WAIT_TIME*2))
+
             flight_info = self.get_flight_info()
             flights[flight_queries['flight_meta']['flight']] = {}
             self.standardise_flight(flight_info, flight_queries['flight_meta'])
             self.configure_driver()
         except Exception as e:
-            print(f"FUCK {e}")
+            print(f"Failed : {flight_info} adding to DLQ")
             self.configure_driver()
 
 def search(query):
