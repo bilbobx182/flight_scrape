@@ -18,7 +18,7 @@ ACCEPT_ALL = "OK"
 
 flights = {}
 
-trip = [['DUB_ICN', 'PUS_NRT', 'KIX_DUB'],
+trip = [
         ['DUB_KIX', 'NRT_PUS', 'ICN_DUB'],
         ['DUB_ICN', 'PUS_KIX', 'NRT_DUB'],
         ['DUB_NRT', 'PUS_ICN', 'KIX_DUB']]
@@ -138,7 +138,7 @@ class SkyScanner:
             flights[meta['flight']][columns[0]] = []
 
             flight_data_formatted = {'date': meta['date'],"price": columns[1],"time_hours": columns[2]}
-            print(f"Adding {meta['flight']} {columns[0]} {flight_data_formatted}")
+            print(f"{meta['flight']},{columns[0]},{flight_data_formatted}")
             flights[meta['flight']][columns[0]].append(flight_data_formatted)
 
     def search_flight(self, flight_queries):
@@ -168,6 +168,8 @@ class SkyScanner:
 
 if __name__ == '__main__':
 
+    dead_letter_queries = []
+
     # I want a bunch of flight to compare prices between start and end of the month
     day_numbers = [1, 10, 20, 29]
 
@@ -182,8 +184,20 @@ if __name__ == '__main__':
                 sky.search_flight(flight_query)
                 sleep(random.randint(45, 120))
         except Exception as error:
-            print(error)
+            dead_letter_queries.append(flight_query)
         finally:
             pprint.pprint(flights)
 
+        # Try only dead letter now, make this better and recursive
+        # Todo make own method
+        for day in day_numbers:
+            dates = get_dates(day=day, month=7)
+            sleep(random.randint(45, 120))
+            try:
+                sky = SkyScanner()
+                for flight_query in dead_letter_queries:
+                    sky.search_flight(flight_query)
+                    sleep(random.randint(45, 120))
+            except Exception as error:
+                dead_letter_queries.append(flight_query)
 
