@@ -1,7 +1,6 @@
 import datetime
 import random
 from time import sleep
-import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium import webdriver
@@ -35,13 +34,18 @@ def get_dates(month=MONTH, day=DAY, between=[6, 10]):
     date_format = "%y%m%d"
     start_date = datetime.datetime(2024, month, day)
     start = start_date.strftime(date_format)
-    # Todo could be better, but idk
+    # Todo could be better, but it works.
     mid = ((start_date + datetime.timedelta(days=between[0])).strftime(date_format))
     end = ((start_date + datetime.timedelta(days=between[1])).strftime(date_format))
     return [start, mid, end]
 
 
 def generate_flight_query(dates):
+    """
+    Generate the URLs we will use, along with metadata.
+    :param dates:
+    :return:
+    """
     URL = "https://www.skyscanner.ie/transport/flights/{}/{}/{}/?adults=1"
     result = []
 
@@ -62,18 +66,16 @@ def generate_flight_query(dates):
     return result
 
 
-
-
 class SkyScanner:
     driver = None
 
     def __init__(self):
-        # self.configure_driver()
         print("Starting")
 
     def configure_driver(self):
         """
-        We need to fake the user agent otherwise we're a bot
+        We need to deal with the user agent.
+        Restart the driver each query to avoid bots.
         :return: None
         """
 
@@ -100,7 +102,6 @@ class SkyScanner:
         )
 
         self.driver = driver
-
 
     def handle_cookies(self):
         """
@@ -138,7 +139,7 @@ class SkyScanner:
             flights[meta['flight']][columns[0]] = []
 
             flight_data_formatted = {'date': meta['date'],"price": columns[1],"time_hours": columns[2]}
-            print(f"{meta['flight']},{columns[0]},{flight_data_formatted}")
+            print(f"{meta['flight']},{flight_data_formatted['date']},{columns[0]},{columns[1]},{columns[2]}")
             flights[meta['flight']][columns[0]].append(flight_data_formatted)
 
     def search_flight(self, flight_queries):
@@ -164,6 +165,23 @@ class SkyScanner:
             print(f"FUCK {e}")
             self.configure_driver()
 
+def search(query):
+    """
+    Method to search, handles failed attempts due to bot detetction.
+
+    :param query: Takes a single query from generate_flight_query(dates)
+    :return: None
+    """
+    dead_letter_queries = []
+    try:
+        sky = SkyScanner()
+        sky.search_flight(flight_query)
+        sleep(random.randint(45, 120))
+    except Exception as error:
+        dead_letter_queries.append(query)
+    finally:
+        pprint.pprint(flights)
+    return dead_letter_queries
 
 
 if __name__ == '__main__':
@@ -173,31 +191,14 @@ if __name__ == '__main__':
     # I want a bunch of flight to compare prices between start and end of the month
     day_numbers = [1, 10, 20, 29]
 
-
     for day in day_numbers:
         dates = get_dates(day=day, month=7)
         sleep(random.randint(45, 120))
         try:
-            flight_queries = generate_flight_query(dates)
-            sky = SkyScanner()
-            for flight_query in flight_queries:
-                sky.search_flight(flight_query)
-                sleep(random.randint(45, 120))
-        except Exception as error:
-            dead_letter_queries.append(flight_query)
-        finally:
-            pprint.pprint(flights)
+            for flight_query in generate_flight_query(dates):
+                search(flight_query)
+        except Exception as e:
+            for dead_letter_flight in dead_letter_queries:
+                search(dead_letter_flight)
 
-        # Try only dead letter now, make this better and recursive
-        # Todo make own method
-        for day in day_numbers:
-            dates = get_dates(day=day, month=7)
-            sleep(random.randint(45, 120))
-            try:
-                sky = SkyScanner()
-                for flight_query in dead_letter_queries:
-                    sky.search_flight(flight_query)
-                    sleep(random.randint(45, 120))
-            except Exception as error:
-                dead_letter_queries.append(flight_query)
 
